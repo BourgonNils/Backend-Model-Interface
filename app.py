@@ -16,7 +16,7 @@ import pandas as pd
 
 
 app = Flask(__name__)
-cors = CORS(app)
+CORS(app)
 
 scraper = Scrapper()
 sessions = dict()
@@ -84,9 +84,9 @@ def scrap_df():
         lang = 'fr'
         limit = int(data["limit_scrap"])
         begin_date = datetime.datetime.strptime(data["begin_date"],
-                                                "%m/%d/%Y").date()
+                                                "%d/%m/%Y").date()
         end_date = datetime.datetime.strptime(data["end_date"],
-                                              "%m/%d/%Y").date()
+                                              "%d/%m/%Y").date()
         keywords = data["keywords"]
         keywords = [str(r) for r in keywords]  # Remove encoding
         df = scraper.get_tweets_df(keywords=keywords,
@@ -94,9 +94,7 @@ def scrap_df():
                                    begindate=begin_date,
                                    enddate=end_date,
                                    limit=limit)
-        df.drop_duplicates(subset='id', keep="last")
         sessions[session_token] = df
-        print(df)
         response = jsonify({
             'session_token': session_token,
             'dataframe_length': df.shape[0]
@@ -118,18 +116,18 @@ def predict():
         df = sessions[session_token]
         # Feature enginnering
 
-        print(df)
         featuresExtrator = FeaturesExtraction(df, "text")
         featuresExtrator.fit_transform()
 
         # Preprocessing
         text_preprocessing = TextPreprocessing(df, "text")
-        text_preprocessing.fit_transform()
-
+        text_preprocessing.fit_transform(inplace=True)
+        print(df["text"])
         # drop small-text columns
-        df = df[~(df['processed_text'].str.len() > 100)]
-        #df = df[len(df['processed_text']) > 60]
+        #TODO Check length minimal
+        # df = df[~(df['text'].str.len() > 60)]
         # Load model ,Tokenizer , labels_dict , features
+        print(df["text"])
 
         model, tokenizer, labels_dict, features = get_model(
             domain_name, model_name)

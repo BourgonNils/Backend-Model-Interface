@@ -121,7 +121,6 @@ models_dic = {
     }},
 }
 
-
 def get_model(domain, model_name):
     
 
@@ -140,3 +139,28 @@ def get_model(domain, model_name):
         models[domain]['models'][model_name]["tokenizer_base"])
 
     return model, Tokenizer, models[domain]["labels_dic"], features
+
+
+
+
+
+if __name__ == '__main__':
+
+    dict_ = {}
+
+    for class_task in models_dic.items():
+        print(class_task)
+        for i, k in enumerate(class_task):
+            print(i)
+            print(k)
+            # dict_[i] = {}
+            # dict_[i]['name'] = k
+            # dict_[i]['models'] = []
+            # j = 0
+
+
+            # for k_ in models_dic[k]['models'].items():
+            #     if 'features' not in models_dic['models'][k_]:
+            #         dict_[i]['models'].append({'name': k_})
+
+    # print(dict_)
