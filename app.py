@@ -77,7 +77,6 @@ def scrap(ID):
 def scrap_df():
     if request.method == 'POST':
         # we will get the file from the request
-        #keywords = request.form.getlist('keywords')
         print(request.json)
         data = request.json
         session_token = str(uuid.uuid4())
@@ -121,7 +120,7 @@ def predict():
 
         # Preprocessing
         text_preprocessing = TextPreprocessing(df, "text")
-        text_preprocessing.fit_transform(inplace=True)
+        text_preprocessing.fit_transform()
         print(df["text"])
         # drop small-text columns
         #TODO Check length minimal
@@ -133,7 +132,7 @@ def predict():
             domain_name, model_name)
 
         # get text
-        sentences = df["text"]
+        sentences = df["processed_text"]
         bert_input = BertInput(tokenizer)
         sentences = bert_input.fit_transform(sentences)
         input_ID = torch.tensor(sentences[0])
@@ -178,6 +177,8 @@ def predict_one():
         df = pd.DataFrame.from_dict({"text": [data['text']]})
         print(data['text'])
 
+
+
         # Feature enginnering
         print(df)
         featuresExtrator = FeaturesExtraction(df, "text")
@@ -188,7 +189,10 @@ def predict_one():
         text_preprocessing.fit_transform()
 
         # drop small-text columns
+        print(len(df))
         df = df[~(df['processed_text'].str.len() > 100)]
+        print(len(df['processed_text'][0]))
+        print(len(df))
         #df = df[len(df['processed_text']) > 60]
         # Load model ,Tokenizer , labels_dict , features
 
@@ -196,7 +200,7 @@ def predict_one():
             domain_name, model_name)
 
         # get text
-        sentences = df["text"]
+        sentences = df["processed_text"]
         bert_input = BertInput(tokenizer)
         sentences = bert_input.fit_transform(sentences)
         input_ID = torch.tensor(sentences[0])
@@ -219,4 +223,4 @@ def predict_one():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=4000)
+    app.run(debug=True, host='127.0.0.1', port=4000)

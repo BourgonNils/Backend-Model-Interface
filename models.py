@@ -13,7 +13,7 @@ class BasicBertForClassification(nn.Module):
         """
         :param bert_model: a bert base model can be Bert,Flaubert or Camembert 
         :param n_class: int
-        :param dropout_rate : float 
+        :param dropout_rate : float
         """
 
         super(BasicBertForClassification, self).__init__()

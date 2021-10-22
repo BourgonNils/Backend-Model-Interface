@@ -8,38 +8,38 @@ import pandas as pd
 
 from Scweet.scweet import scrape
 from Scweet.user import get_user_information, get_users_following, get_users_followers
-
+import twint
+import nest_asyncio
 
 
 class Scrapper: 
     def get_tweets_df(self, keywords, lang, begindate, enddate, limit):
-        
+        # nest_asyncio.apply()
+
         # tweets_df = pd.read_csv("/home/nilsb/INTACT/Interface/TEST_Interface/demo_parser.csv", sep=",")
 
-        begindate_str = begindate.strftime("%Y-%m-%d")
-        enddate_str = enddate.strftime("%Y-%m-%d")
+        
+        c = twint.Config()
+        c.Limit = limit
+        c.Search = keywords
+        c.Pandas = True
+        c.Since = begindate.strftime("%Y-%m-%d")
+        c.Until = enddate.strftime("%Y-%m-%d")
+        twint.run.Search(c)
+        tweets_df = twint.storage.panda.Tweets_df
 
-        tweets_df = scrape(words=keywords, since=begindate_str, 
-        until=enddate_str, lang=lang, limit=calcultate_limit_per_interval(limit,begindate,enddate),
-        interval=1,from_account = None, 
-        headless=True, display_type="Top", save_images=False,
-        resume=False, filter_replies=False, proximity=False)
+        tweets_df = tweets_df.head(limit)
 
         tweets_df = tweets_df.rename(columns={
             'UserName':'user',
-            'Embedded_text':'text',
-          	'Likes' :'likes',
-            'Retweets':'retweets'
+            'tweet':'text',
+          	'likes_count' :'likes',
+            'retweets_count':'retweets'
         })
+
         print("Df tweets :")
         print(tweets_df.columns)
         return tweets_df
-
-
-def calcultate_limit_per_interval(limit_total,since,until,interval=1):
-
-    delta   = until - since
-    return limit_total * interval /  delta.days   
 
    
 class old_Scrapper:

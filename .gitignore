@@ -1,4 +1,3 @@
+#GitIgnore
 __pycache__/
 outputs/
-#Test
-app.py
