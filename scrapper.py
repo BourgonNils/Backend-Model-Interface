@@ -17,7 +17,6 @@ class Scrapper:
         # nest_asyncio.apply()
 
         # tweets_df = pd.read_csv("/home/nilsb/INTACT/Interface/TEST_Interface/demo_parser.csv", sep=",")
-
         
         c = twint.Config()
         c.Limit = limit

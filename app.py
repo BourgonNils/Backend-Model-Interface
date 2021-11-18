@@ -94,6 +94,7 @@ def scrap_df():
                                    enddate=end_date,
                                    limit=limit)
         sessions[session_token] = df
+        print(df.columns)
         response = jsonify({
             'session_token': session_token,
             'dataframe_length': df.shape[0]
@@ -126,7 +127,6 @@ def predict():
         #TODO Check length minimal
         # df = df[~(df['text'].str.len() > 60)]
         # Load model ,Tokenizer , labels_dict , features
-        print(df["text"])
 
         model, tokenizer, labels_dict, features = get_model(
             domain_name, model_name)
