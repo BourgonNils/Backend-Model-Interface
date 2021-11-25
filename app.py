@@ -13,7 +13,7 @@ import numpy as np
 from flask_cors import CORS, cross_origin
 from model_dict import models_dic
 import pandas as pd
-
+import csv
 
 app = Flask(__name__)
 CORS(app)
@@ -100,6 +100,8 @@ def scrap_df():
             'dataframe_length': df.shape[0]
         })
         return response
+
+
 
 
 @app.route("/api/predict_dataframe", methods=["POST"])
@@ -217,9 +219,25 @@ def predict_one():
         # Inference
         response = jsonify({
             'prediction': df['prediction'].iloc[0],
+            'allLabels': list(labels_dict.values())
         })
 
         return response
+
+@app.route("/api/save_correction", methods=["POST"])
+@cross_origin()
+def save_correction():
+    if request.method == 'POST':
+        data = request.json
+        print(data)
+        row = [data['tweetID'],data['text'], data['labelPred'], data['correctedLabel']]
+        filename = "outputs/manual_correction/corrections.csv"
+        with open(filename, 'a+',newline='') as csvfile: 
+            csvwriter = csv.writer(csvfile) 
+            csvwriter.writerow(row)        
+        return jsonify("OK")
+
+
 
 
 if __name__ == "__main__":
