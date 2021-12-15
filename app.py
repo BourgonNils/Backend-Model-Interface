@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request, Response, redirect, url_for
 import uuid
 from scrapper import Scrapper
 import datetime
@@ -14,6 +14,9 @@ from flask_cors import CORS, cross_origin
 from model_dict import models_dic
 import pandas as pd
 import csv
+from werkzeug.utils import secure_filename
+import os
+import utils
 
 app = Flask(__name__)
 CORS(app)
@@ -21,26 +24,23 @@ CORS(app)
 scraper = Scrapper()
 sessions = dict()
 
+app.config['UPLOAD_FOLDER'] = "/home/nilsb/INTACT/Interface/IRIT_TEXT_Backend_Forked/outputs/uploaded_files"
 
 @app.route('/api/get_noFeatures_models/', methods=['GET'])
 @cross_origin()
 def get_noFeatures_models():
-
     dict_ = {}
-
     for Field,class_task in models_dic.items(): 
         dict_[Field]=[]
-        print(Field)
         for i, k in enumerate(class_task):
             dict_[Field].append({})
             dict_[Field][i]['name'] = k
             dict_[Field][i]['models'] = []
             j = 0
-            
+
             for k_, v_ in models_dic[Field][k]['models'].items():
                 if 'features' not in models_dic[Field][k]['models'][k_]:
                     dict_[Field][i]['models'].append({'name': k_})
-
     response = jsonify(dict_)
     return response
 
@@ -79,6 +79,11 @@ def scrap_df():
         # we will get the file from the request
         print(request.json)
         data = request.json
+        session_token = data['session_token']
+        print(session_token)
+        if session_token == "null":
+            print("Génération nouveau id")
+            session_token = str(uuid.uuid4())
         session_token = str(uuid.uuid4())
         lang = 'fr'
         limit = int(data["limit_scrap"])
@@ -93,15 +98,13 @@ def scrap_df():
                                    begindate=begin_date,
                                    enddate=end_date,
                                    limit=limit)
-        sessions[session_token] = df
-        print(df.columns)
+        addInstances(session_token,sessions,df)
+        print(df.head)
         response = jsonify({
             'session_token': session_token,
             'dataframe_length': df.shape[0]
         })
         return response
-
-
 
 
 @app.route("/api/predict_dataframe", methods=["POST"])
@@ -164,9 +167,28 @@ def predict():
             'dataframe': df.to_json(orient="records"),
             'summary': df['prediction'].value_counts().to_json(),
         })
-
         return response
 
+
+@app.route("/api/get_data", methods=["POST"])
+@cross_origin()
+def get_data():
+    print("Function get dataAPI")
+    if request.method == 'POST':
+    
+        data = request.json
+        session_token = str(data["session_token"])
+        if session_token in sessions.keys():
+            df = sessions[session_token]
+            data =df.to_json(orient="records")
+        else:
+            data = "no_data"
+        
+        response = jsonify({
+            'session_token': session_token,
+            'dataframe': data
+        })
+        return response
 
 @app.route("/api/predict_onetweet", methods=["POST"])
 @cross_origin()
@@ -224,6 +246,7 @@ def predict_one():
 
         return response
 
+
 @app.route("/api/save_correction", methods=["POST"])
 @cross_origin()
 def save_correction():
@@ -238,7 +261,49 @@ def save_correction():
         return jsonify("OK")
 
 
+@app.route("/api/uploadCSV", methods=["POST"])
+@cross_origin() 
+def uploadCSV():
+    if request.method == 'POST':
+        session_token = request.form['session_token']
+        if session_token == "null":
+            session_token = str(uuid.uuid4())    
+        if 'file' not in request.files:
+            return redirect(request.url)
+        file = request.files['file']
+        if file.filename == '':
+            return redirect(request.url)
+        if file and utils.allowed_file(file.filename, ['csv']):
+            col_text = request.form['text_col']
+            filename = os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(file.filename))
+            file.save(filename)
+            df =pd.read_csv(filename)
+            df = df.rename(columns={col_text:'text'})
+            
+            all_cols_but_text = [col for col in utils.COL_USED if col!='text'] 
+            for col in  all_cols_but_text:
+                df[col] ='unknown'
+            
+            print(df.head())
+            addInstances(session_token,sessions,df[utils.COL_USED])
+    response = jsonify({
+        'session_token': session_token,
+        'dataframe_length': df.shape[0]
+    })
+    return response
 
 
-if __name__ == "__main__":
+def addInstances(id,dict,df):
+    print("Add instance ")
+    if id in dict.keys():
+        prec = dict[id] 
+        dict[id] = pd.concat([prec,df])
+        print("rajout")
+        print(dict[id])
+    else:
+        print("New")
+        dict[id] = df
+    
+
+if __name__ == "__main__"   :
     app.run(debug=True, host='127.0.0.1', port=4000)
