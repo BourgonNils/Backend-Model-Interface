@@ -3,6 +3,7 @@ import uuid
 from scrapper import Scrapper
 import datetime
 import sys
+import json
 from preprocessing.text_preprocessing import TextPreprocessing
 from preprocessing.feature_enginering import FeaturesExtraction
 from model_dict import get_model
@@ -161,10 +162,15 @@ def predict():
             pred.append(labels_dict.get(label_index))
         df['prediction'] = pred
 
+        # for label in 
+        # df1['TEXTE'][df1['urgence'] == "Message-InfoUrgent"]
+
+    
         # Inference
         response = jsonify({
             'session_token': session_token,
             'dataframe': df.to_json(orient="records"),
+            'allLabels' : json.dumps(df['prediction'].unique().tolist()),
             'summary': df['prediction'].value_counts().to_json(),
         })
         return response
@@ -175,18 +181,22 @@ def predict():
 def get_data():
     print("Function get dataAPI")
     if request.method == 'POST':
-    
         data = request.json
         session_token = str(data["session_token"])
         if session_token in sessions.keys():
             df = sessions[session_token]
             data =df.to_json(orient="records")
+            word_cloud_data = utils.get_data_word_cloud(df['text'])
+            print(word_cloud_data)
+            word_cloud_data = json.dumps(word_cloud_data)
         else:
             data = "no_data"
+            word_cloud_data = "no_data"
         
         response = jsonify({
             'session_token': session_token,
-            'dataframe': data
+            'dataframe': data,
+            'word_cloud_data' :word_cloud_data 
         })
         return response
 
