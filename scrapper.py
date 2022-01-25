@@ -12,8 +12,10 @@ import twint
 import nest_asyncio
 import utils
 
-class Scrapper: 
-    def get_tweets_df(self, keywords, lang, begindate, enddate, limit):
+
+class Scrapper:
+    def get_tweets_df(self, keywords, lang, begindate, enddate, onlyVerified,
+                      onlyContainsMedia, limit):
         # nest_asyncio.apply()
 
         # tweets_df = pd.read_csv("/home/nilsb/INTACT/Interface/TEST_Interface/demo_parser.csv", sep=",")
@@ -24,23 +26,33 @@ class Scrapper:
         c.Pandas = True
         c.Since = begindate.strftime("%Y-%m-%d")
         c.Until = enddate.strftime("%Y-%m-%d")
+
+        #Do not declare c.Verified to false : return only tweets from unverified account 
+        if onlyVerified :
+            c.Verified = onlyVerified
+        if onlyContainsMedia :
+            c.Media = onlyContainsMedia
+
         twint.run.Search(c)
         tweets_df = twint.storage.panda.Tweets_df
 
         tweets_df = tweets_df.head(limit)
 
         tweets_df = tweets_df.rename(columns={
-            'tweet':'text',
-          	'nlikes' :'likes',
-            'nretweets':'retweets'
+            'tweet': 'text',
+            'nlikes': 'likes',
+            'nretweets': 'retweets'
         })
         # tweets_df['contains_media'] = (tweets_df['photos'] | tweets_df['video'] !=0)
         print("Df tweets :")
         print(tweets_df.columns)
-        
-        return tweets_df[utils.COL_USED]
+        if len(tweets_df) != 0:
+            return tweets_df[utils.COL_USED]
+        else:
+            # TODO Refacto
+            return tweets_df
 
-   
+
 class old_Scrapper:
 
     def __tweet_line(self, tt):
@@ -175,5 +187,3 @@ class old_Scrapper:
         tweet_div = next(x for x in tweet_div_list if x["data-tweet-id"] == ID)
         tweet = self.__from_soup(tweet_div)
         return tweet
-
-

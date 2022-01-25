@@ -1,7 +1,7 @@
 from models import BasicBertForClassification, BertFeaturesForSequenceClassification
 from transformers import AutoTokenizer
 
-# When you add a model or a domain to your app Just import your model and add the path to it
+# When you add a model or a task to your app Just import your model and add the path to it
 models_dic = {
 
     "Crisis": {
@@ -22,7 +22,8 @@ models_dic = {
             "labels_dic": {
                 0: 'Message-Utilisable',
                 1: 'Message-NonUtilisable'
-            }
+            },
+            "description": "Predict if the tweet is about a crisis"
         },
         "Predict urgency": {
             'models': {
@@ -40,8 +41,12 @@ models_dic = {
             "labels_dic": {
                 0: 'Message-InfoUrgent',
                 1: 'Message-NonUtilisable',
-                2: 'Message-InfoNonUrgent', }
+                2: 'Message-InfoNonUrgent', },
+
+            "description": "Predict if a tweet is about a crisis and asses the urgency"
+
         },
+
         "Predict category": {
             'models': {
                 "bert_base_multiligual_cased": {
@@ -62,11 +67,14 @@ models_dic = {
                 3: 'Message-NonUtilisable',
                 4: 'Avertissement-conseil',
                 5: 'Soutiens',
-                6: 'Critiques'}
+                6: 'Critiques'},
+
+            "description": "Predict if a tweet is about a crisis and determine the type of information"
+
         }
     },
 
-    "Pyscho": {
+    "Psycho": {
         "TestTaskPsycho": {
             'models': {
                 "flaubert-base-cased": {
@@ -83,28 +91,50 @@ models_dic = {
             "labels_dic": {
                 0: 'Message-Utilisable',
                 1: 'Message-NonUtilisable'
-            }
+            },
+            "description": "DummyTask"
         }
 
+    },
+    "Speech act": {
+        "Predict speech act": {
+            "models": {
+                "best-SA": {
+                    "model": BasicBertForClassification,
+                    "path": "../models_weights/SA/BestSA.pth",
+                    "tokenizer_base": "camembert-base",
+                },
+            },
+            "labels_dic": {0: 'Jussif', 1: 'Assertif', 2: 'Subjectif', 3: 'Interrogatif'},
+            "description": "Predict the speech act within the speech act. The tweet can be : Assertive, Interrogative, Jussive or Subjective"
+
+
+        }
     }
 }
 
 
-def get_model(domain, model_name):
+def get_model(task, model_name):
     models = {}
     for d in list(models_dic.values()):
         models.update(d)
-    model = models[domain]['models'][model_name]["model"].load(
-        models[domain]['models'][model_name]["path"])
 
-    if "features" in models[domain]['models'][model_name]:
-        features = models[domain]['models'][model_name]["features"]
+    if model_name == "":
+        print("\nUsing default model !\n")
+        model_name = list(models[task]['models'].keys())[0]
+
+    model = models[task]['models'][model_name]["model"].load(
+        models[task]['models'][model_name]["path"])
+
+    if "features" in models[task]['models'][model_name]:
+        features = models[task]['models'][model_name]["features"]
     else:
         features = []
-    Tokenizer = AutoTokenizer.from_pretrained(
-        models[domain]['models'][model_name]["tokenizer_base"])
 
-    return model, Tokenizer, models[domain]["labels_dic"], features
+    Tokenizer = AutoTokenizer.from_pretrained(
+        models[task]['models'][model_name]["tokenizer_base"])
+
+    return model, Tokenizer, models[task]["labels_dic"], features
 
 
 if __name__ == '__main__':

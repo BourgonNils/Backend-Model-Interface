@@ -27,17 +27,18 @@ sessions = dict()
 
 app.config['UPLOAD_FOLDER'] = "/home/nilsb/INTACT/Interface/IRIT_TEXT_Backend_Forked/outputs/uploaded_files"
 
+
 @app.route('/api/get_noFeatures_models/', methods=['GET'])
 @cross_origin()
 def get_noFeatures_models():
     dict_ = {}
-    for Field,class_task in models_dic.items(): 
-        dict_[Field]=[]
+    for Field, class_task in models_dic.items():
+        dict_[Field] = []
         for i, k in enumerate(class_task):
             dict_[Field].append({})
             dict_[Field][i]['name'] = k
             dict_[Field][i]['models'] = []
-            j = 0
+            dict_[Field][i]['description'] = models_dic[Field][k]["description"]
 
             for k_, v_ in models_dic[Field][k]['models'].items():
                 if 'features' not in models_dic[Field][k]['models'][k_]:
@@ -52,13 +53,13 @@ def get_all_models():
 
     dict_ = {}
 
-    for Field,class_task in models_dic.items(): 
-        dict_[Field]=[]
+    for Field, class_task in models_dic.items():
+        dict_[Field] = []
         for i, k in enumerate(class_task):
             dict_[Field].append({})
             dict_[Field][i]['name'] = k
             dict_[Field][i]['models'] = [{'name': v_} for k_,
-                                v_ in enumerate(models_dic[Field][k]['models'])]
+                                         v_ in enumerate(models_dic[Field][k]['models'])]
 
     response = jsonify(dict_)
     return response
@@ -81,30 +82,42 @@ def scrap_df():
         print(request.json)
         data = request.json
         session_token = data['session_token']
+        print("\n\n Session token : \n")
         print(session_token)
-        if session_token == "null":
+        if session_token == None:
             print("Génération nouveau id")
             session_token = str(uuid.uuid4())
-        session_token = str(uuid.uuid4())
+        # TODO Mettre dans le front end choix de la langue
         lang = 'fr'
         limit = int(data["limit_scrap"])
         begin_date = datetime.datetime.strptime(data["begin_date"],
                                                 "%d/%m/%Y").date()
         end_date = datetime.datetime.strptime(data["end_date"],
                                               "%d/%m/%Y").date()
+
+        onlyVerified = bool(data["onlyVerified"])
+        onlyContainsMedia = bool(data["onlyContainsMedia"])
         keywords = data["keywords"]
         keywords = [str(r) for r in keywords]  # Remove encoding
         df = scraper.get_tweets_df(keywords=keywords,
                                    lang=lang,
                                    begindate=begin_date,
                                    enddate=end_date,
+                                   onlyVerified=onlyVerified,
+                                   onlyContainsMedia=onlyContainsMedia,
                                    limit=limit)
-        addInstances(session_token,sessions,df)
-        print(df.head)
+        addInstances(session_token, sessions, df)
+        if len(df) == 0:
+            data = "no_data"
+        else:
+            data = df.to_json(orient="records")
+
         response = jsonify({
             'session_token': session_token,
-            'dataframe_length': df.shape[0]
+            'dataframe_length': df.shape[0],
+            'dataframe': data
         })
+        print(response)
         return response
 
 
@@ -116,7 +129,7 @@ def predict():
         print(sessions)
         session_token = str(data["session_token"])
         model_name = str(data["model_name"])
-        domain_name = str(data["field"])
+        domain_name = str(data["task"])
         session_token = session_token
         print(session_token)
         df = sessions[session_token]
@@ -130,7 +143,7 @@ def predict():
         text_preprocessing.fit_transform()
         print(df["text"])
         # drop small-text columns
-        #TODO Check length minimal
+        # TODO Check length minimal
         # df = df[~(df['text'].str.len() > 60)]
         # Load model ,Tokenizer , labels_dict , features
 
@@ -162,16 +175,20 @@ def predict():
             pred.append(labels_dict.get(label_index))
         df['prediction'] = pred
 
-        # for label in 
-        # df1['TEXTE'][df1['urgence'] == "Message-InfoUrgent"]
+        allLabels = list(labels_dict.values())
+        wordCloudData = {}
+        for label in allLabels:
+            text_label = df['text'][df['prediction'] == label]
+            wordCloudData[label] = utils.get_data_word_cloud(text_label)
+        wordCloudData['all'] = utils.get_data_word_cloud(df['text'])
 
-    
         # Inference
         response = jsonify({
             'session_token': session_token,
             'dataframe': df.to_json(orient="records"),
-            'allLabels' : json.dumps(df['prediction'].unique().tolist()),
+            'allLabels': json.dumps(allLabels),
             'summary': df['prediction'].value_counts().to_json(),
+            'wordCloudData': json.dumps(wordCloudData)
         })
         return response
 
@@ -185,20 +202,23 @@ def get_data():
         session_token = str(data["session_token"])
         if session_token in sessions.keys():
             df = sessions[session_token]
-            data =df.to_json(orient="records")
+            data = df.to_json(orient="records")
+            dict_word_cloud = {}
             word_cloud_data = utils.get_data_word_cloud(df['text'])
-            print(word_cloud_data)
-            word_cloud_data = json.dumps(word_cloud_data)
+
+            dict_word_cloud['all'] = word_cloud_data
+            dict_word_cloud = json.dumps(dict_word_cloud)
         else:
             data = "no_data"
-            word_cloud_data = "no_data"
-        
+            dict_word_cloud = "no_data"
+
         response = jsonify({
             'session_token': session_token,
             'dataframe': data,
-            'word_cloud_data' :word_cloud_data 
+            'word_cloud_data': dict_word_cloud
         })
         return response
+
 
 @app.route("/api/predict_onetweet", methods=["POST"])
 @cross_origin()
@@ -207,11 +227,9 @@ def predict_one():
         data = request.json
         print(data)
         model_name = str(data["model_name"])
-        domain_name = str(data["field"])
+        domain_name = str(data["task"])
         df = pd.DataFrame.from_dict({"text": [data['text']]})
         print(data['text'])
-
-
 
         # Feature enginnering
         print(df)
@@ -263,21 +281,23 @@ def save_correction():
     if request.method == 'POST':
         data = request.json
         print(data)
-        row = [data['tweetID'],data['text'], data['labelPred'], data['correctedLabel']]
+        row = [data['tweetID'], data['text'],
+               data['labelPred'], data['correctedLabel']]
         filename = "outputs/manual_correction/corrections.csv"
-        with open(filename, 'a+',newline='') as csvfile: 
-            csvwriter = csv.writer(csvfile) 
-            csvwriter.writerow(row)        
+        with open(filename, 'a+', newline='') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(row)
         return jsonify("OK")
 
 
 @app.route("/api/uploadCSV", methods=["POST"])
-@cross_origin() 
+@cross_origin()
 def uploadCSV():
     if request.method == 'POST':
         session_token = request.form['session_token']
-        if session_token == "null":
-            session_token = str(uuid.uuid4())    
+        print(session_token)
+        if session_token == "":
+            session_token = str(uuid.uuid4())
         if 'file' not in request.files:
             return redirect(request.url)
         file = request.files['file']
@@ -285,35 +305,48 @@ def uploadCSV():
             return redirect(request.url)
         if file and utils.allowed_file(file.filename, ['csv']):
             col_text = request.form['text_col']
-            filename = os.path.join(app.config['UPLOAD_FOLDER'],secure_filename(file.filename))
+            filename = os.path.join(
+                app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
             file.save(filename)
-            df =pd.read_csv(filename)
-            df = df.rename(columns={col_text:'text'})
-            
-            all_cols_but_text = [col for col in utils.COL_USED if col!='text'] 
-            for col in  all_cols_but_text:
-                df[col] ='unknown'
-            
+            df = pd.read_csv(filename)
+            df = df.rename(columns={col_text: 'text'})
+
+            all_cols_but_text = [
+                col for col in utils.COL_USED if col != 'text']
+            for col in all_cols_but_text:
+                df[col] = 'unknown'
+
             print(df.head())
-            addInstances(session_token,sessions,df[utils.COL_USED])
+            data = df[utils.COL_USED]
+            addInstances(session_token, sessions, data)
+
+    if len(data) == 0:
+        data = "no_data"
+    else:
+        data = df.to_json(orient="records")
     response = jsonify({
         'session_token': session_token,
-        'dataframe_length': df.shape[0]
+        'dataframe_length': df.shape[0],
+        'dataframe': data
     })
+    print(response)
     return response
 
+@app.route("/api/test")
+def test():
+   return 'API fonctionnelle !' 
+   
 
-def addInstances(id,dict,df):
+def addInstances(id, dict, df):
     print("Add instance ")
     if id in dict.keys():
-        prec = dict[id] 
-        dict[id] = pd.concat([prec,df])
+        prec = dict[id]
+        dict[id] = pd.concat([prec, df])
         print("rajout")
         print(dict[id])
     else:
         print("New")
         dict[id] = df
-    
 
-if __name__ == "__main__"   :
+if __name__ == "__main__":
     app.run(debug=True, host='127.0.0.1', port=4000)
